@@ -24,6 +24,7 @@ function App() {
   const [estimates, setEstimates] = useState({});
   const [targetScore, setTargetScore] = useState(5);
 
+  // Fetch geographic cohorts from the public CSV link
   useEffect(() => {
     fetch(GEO_URL)
       .then((res) => res.text())
@@ -36,6 +37,7 @@ function App() {
       });
   }, []);
 
+  // Fetch sizable items from the public CSV link
   useEffect(() => {
     fetch(SIZABLE_URL)
       .then((res) => res.text())
@@ -48,6 +50,7 @@ function App() {
       });
   }, []);
 
+  // Randomly select new cards
   const drawNewCards = () => {
     if (sampleGeographicCohorts.length === 0 || sampleSizableItems.length === 0) {
       setCurrentCohort('Still loading...');
@@ -71,6 +74,7 @@ function App() {
     }
   }, [stage, sampleGeographicCohorts, sampleSizableItems]);
 
+  // Round-robin logic to avoid sizer vs themselves
   const nextRound = (winnerIndex, loserIndex) => {
     let newSizerIndex = (loserIndex + 1) % players.length;
     while (newSizerIndex === winnerIndex) {
@@ -81,6 +85,7 @@ function App() {
     drawNewCards();
   };
 
+  // Award 1 point to each if there's a tie
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -93,6 +98,7 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
+  // Judge vote for a single winner
   const handleVote = (winnerIndex) => {
     const updatedPlayers = players.map((p, idx) => {
       if (idx === winnerIndex) {
@@ -107,17 +113,21 @@ function App() {
     nextRound(winnerIndex, loserIndex);
   };
 
+  // No points
   const handleNoPoints = () => {
     const [sizerA, sizerB] = currentSizers;
     nextRound(sizerA, sizerB);
   };
 
+  // Handle changes to sizers' estimates
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
   };
 
+  // Check if any player has reached the target score
   const champion = players.find((p) => p.score >= targetScore);
 
+  // Start Game (after setup)
   const handleStartGame = () => {
     setSetupError('');
     const trimmedNames = tempNames.map((n) => n.trim());
@@ -139,7 +149,7 @@ function App() {
 
   if (stage === 'setup') {
     return (
-      <div className="min-h-screen bg-gray-100 p-4">
+      <div className="min-h-screen bg-blue-100 p-4 font-[Arial]">
         <motion.div
           className="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg"
           initial={{ opacity: 0, y: 10 }}
@@ -161,7 +171,7 @@ function App() {
                   setTempNames([]);
                 }
               }}
-              className="border p-2 rounded w-24"
+              className="border border-black rounded p-2 w-24"
             />
           </div>
 
@@ -172,7 +182,7 @@ function App() {
                 <label className="block text-sm font-medium mb-1">Player {i + 1} Name:</label>
                 <input
                   type="text"
-                  className="border p-2 rounded w-full"
+                  className="border border-black rounded p-2 w-full"
                   value={tempNames[i] || ''}
                   onChange={(e) => {
                     const newArr = [...tempNames];
@@ -190,7 +200,7 @@ function App() {
               type="number"
               value={targetScore}
               onChange={(e) => setTargetScore(Number(e.target.value))}
-              className="border p-2 rounded w-24"
+              className="border border-black rounded p-2 w-24"
             />
           </div>
 
@@ -215,7 +225,7 @@ function App() {
   const bothGuessedSame = estimateA !== '' && estimateB !== '' && estimateA === estimateB;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen bg-blue-100 p-4 font-[Arial]">
       <motion.div
         className="max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-lg"
         initial={{ opacity: 0, y: 10 }}
@@ -252,7 +262,7 @@ function App() {
                 <label className="block font-semibold mb-1">{players[sizerA].name}'s Estimate</label>
                 <input
                   type="number"
-                  className="border p-2 rounded w-full"
+                  className="border border-black rounded p-2 w-full"
                   placeholder="Enter your single, exact numerical estimate"
                   value={estimateA}
                   onChange={(e) => handleEstimateChange(sizerA, e.target.value)}
@@ -262,7 +272,7 @@ function App() {
                 <label className="block font-semibold mb-1">{players[sizerB].name}'s Estimate</label>
                 <input
                   type="number"
-                  className="border p-2 rounded w-full"
+                  className="border border-black rounded p-2 w-full"
                   placeholder="Enter your single, exact numerical estimate"
                   value={estimateB}
                   onChange={(e) => handleEstimateChange(sizerB, e.target.value)}
