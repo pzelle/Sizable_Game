@@ -8,7 +8,7 @@ const SIZABLE_URL =
   'https://docs.google.com/spreadsheets/d/1zeW6OCKSnpCKt6o1VRGZ2yR3mTCH1OmPY7m_zHVURHI/export?format=csv&gid=0';
 
 function App() {
-  // 'setup' or 'playing'
+  // Stage: 'setup' or 'playing'
   const [stage, setStage] = useState('setup');
   const [numPlayers, setNumPlayers] = useState(4);
   const [tempNames, setTempNames] = useState([]);
@@ -18,55 +18,69 @@ function App() {
   const [sampleGeographicCohorts, setSampleGeographicCohorts] = useState([]);
   const [sampleSizableItems, setSampleSizableItems] = useState([]);
 
+  // Indices of current sizers
   const [currentSizers, setCurrentSizers] = useState([0, 1]);
+
+  // Current randomly drawn items (string)
   const [currentCohort, setCurrentCohort] = useState('');
   const [currentSizable, setCurrentSizable] = useState('');
+
+  // Sizer estimates
   const [estimates, setEstimates] = useState({});
+
+  // Score to win
   const [targetScore, setTargetScore] = useState(5);
 
-  // Fetch geographic cohorts from the public CSV link
+  // Fetch geographic cohorts
   useEffect(() => {
     fetch(GEO_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split('\n').map((line) => line.trim()).filter((line) => line);
+        const lines = text.split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line);
         setSampleGeographicCohorts(lines);
       })
-      .catch((err) => {
-        console.error('Error fetching geographic cohorts:', err);
-      });
+      .catch((err) => console.error('Error fetching geographic cohorts:', err));
   }, []);
 
-  // Fetch sizable items from the public CSV link
+  // Fetch sizable items
   useEffect(() => {
     fetch(SIZABLE_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split('\n').map((line) => line.trim()).filter((line) => line);
+        const lines = text.split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line);
         setSampleSizableItems(lines);
       })
-      .catch((err) => {
-        console.error('Error fetching sizable items:', err);
-      });
+      .catch((err) => console.error('Error fetching sizable items:', err));
   }, []);
 
   // Randomly select new cards
   const drawNewCards = () => {
-    if (sampleGeographicCohorts.length === 0 || sampleSizableItems.length === 0) {
+    if (!sampleGeographicCohorts.length || !sampleSizableItems.length) {
       setCurrentCohort('Still loading...');
       setCurrentSizable('Still loading...');
       return;
     }
+    // Random pick
     const randomCohort = sampleGeographicCohorts[
       Math.floor(Math.random() * sampleGeographicCohorts.length)
     ];
     const randomSizable = sampleSizableItems[
       Math.floor(Math.random() * sampleSizableItems.length)
     ];
-    setCurrentCohort(randomCohort);
-    setCurrentSizable(randomSizable);
+
+    // Remove any extra quotes from CSV lines
+    const cohortNoQuotes = randomCohort.replace(/"/g, '');
+    const sizableNoQuotes = randomSizable.replace(/"/g, '');
+
+    setCurrentCohort(cohortNoQuotes);
+    setCurrentSizable(sizableNoQuotes);
   };
 
+  // Start drawing cards once we're playing
   useEffect(() => {
     if (stage === 'playing') {
       drawNewCards();
@@ -74,7 +88,7 @@ function App() {
     }
   }, [stage, sampleGeographicCohorts, sampleSizableItems]);
 
-  // Round-robin logic to avoid sizer vs themselves
+  // Round-robin logic
   const nextRound = (winnerIndex, loserIndex) => {
     let newSizerIndex = (loserIndex + 1) % players.length;
     while (newSizerIndex === winnerIndex) {
@@ -85,7 +99,7 @@ function App() {
     drawNewCards();
   };
 
-  // Award 1 point to each if there's a tie
+  // If both sizers guessed the same number
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -98,7 +112,7 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Judge vote for a single winner
+  // Judge votes for a single winner
   const handleVote = (winnerIndex) => {
     const updatedPlayers = players.map((p, idx) => {
       if (idx === winnerIndex) {
@@ -119,15 +133,15 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Handle changes to sizers' estimates
+  // Sizers' estimates
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
   };
 
-  // Check if any player has reached the target score
+  // Check if a champion
   const champion = players.find((p) => p.score >= targetScore);
 
-  // Start Game (after setup)
+  // Start the game
   const handleStartGame = () => {
     setSetupError('');
     const trimmedNames = tempNames.map((n) => n.trim());
@@ -141,22 +155,23 @@ function App() {
       setSetupError('All player names must be unique.');
       return;
     }
-
     const newPlayers = trimmedNames.map((name) => ({ name, score: 0 }));
     setPlayers(newPlayers);
     setStage('playing');
   };
 
+  // If we're still at setup screen
   if (stage === 'setup') {
     return (
-      <div className="min-h-screen bg-blue-100 p-4 font-[Arial]">
+      <div className="min-h-screen bg-blue-100 flex items-center justify-center font-[Arial]">
         <motion.div
-          className="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg"
+          className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-2xl font-bold mb-4">Sizeable Game Setup</h1>
+          <h1 className="text-2xl font-bold mb-4 text-center">Sizeable Game Setup</h1>
+
           <div className="mb-4">
             <label className="block font-semibold mb-2">How many players?</label>
             <input
@@ -178,8 +193,10 @@ function App() {
           <div className="mb-4">
             <h2 className="text-xl font-semibold mb-2">Enter Player Names</h2>
             {[...Array(numPlayers)].map((_, i) => (
-              <div key={i} className="mb-2">
-                <label className="block text-sm font-medium mb-1">Player {i + 1} Name:</label>
+              <div key={i} className="mb-3">
+                <label className="block text-sm font-medium mb-1">
+                  Player {i + 1} Name:
+                </label>
                 <input
                   type="text"
                   className="border border-black rounded p-2 w-full"
@@ -205,139 +222,164 @@ function App() {
           </div>
 
           {setupError && (
-            <div className="mb-4 text-red-600 font-semibold">{setupError}</div>
+            <div className="mb-4 text-red-600 font-semibold text-center">{setupError}</div>
           )}
 
+          <div className="flex justify-center">
+            <button
+              onClick={handleStartGame}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Start Game
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // At game screen
+  const [sizerA, sizerB] = currentSizers;
+  const estimateA = estimates[sizerA] || '';
+  const estimateB = estimates[sizerB] || '';
+  const bothGuessedSame = estimateA && estimateB && estimateA === estimateB;
+
+  // If someone won
+  if (champion) {
+    return (
+      <div className="min-h-screen bg-blue-100 flex items-center justify-center font-[Arial]">
+        <motion.div
+          className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md text-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="text-2xl font-bold mb-4">We Have a Champion!</h1>
+          <p className="text-xl mb-6">
+            Congratulations {champion.name}, you reached {champion.score} points!
+          </p>
           <button
-            onClick={handleStartGame}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            onClick={() => {
+              const resetPlayers = players.map((p) => ({ ...p, score: 0 }));
+              setPlayers(resetPlayers);
+              setCurrentSizers([0, 1]);
+              setEstimates({});
+              setStage('setup');
+            }}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
           >
-            Start Game
+            Play Again
           </button>
         </motion.div>
       </div>
     );
   }
 
-  const [sizerA, sizerB] = currentSizers;
-  const estimateA = estimates[sizerA] || '';
-  const estimateB = estimates[sizerB] || '';
-  const bothGuessedSame = estimateA !== '' && estimateB !== '' && estimateA === estimateB;
-
+  // Active game screen
   return (
-    <div className="min-h-screen bg-blue-100 p-4 font-[Arial]">
+    <div className="min-h-screen bg-blue-100 flex items-center justify-center font-[Arial]">
       <motion.div
-        className="max-w-3xl mx-auto bg-white p-6 rounded-2xl shadow-lg"
+        className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-3xl"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {!champion && (
-          <>
-            <h1 className="text-2xl font-bold mb-4">Sizeable Game</h1>
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Scores</h2>
-              <ul className="grid grid-cols-2 gap-2">
-                {players.map((player, idx) => (
-                  <li key={idx} className="flex justify-between bg-gray-50 p-2 rounded">
-                    <span>{player.name}</span>
-                    <span>{player.score}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <h1 className="text-2xl font-bold mb-4 text-center">Sizeable Game</h1>
 
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Current Question</h2>
-              <p className="text-lg mb-2">
-                How many <span className="font-bold">{currentSizable}</span> in{' '}
-                <span className="font-bold">{currentCohort}</span>?
-              </p>
-              <p>(All players should agree on the scope of the question before proceeding.)</p>
-            </div>
+        {/* Scores */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-2">Scores</h2>
+          <ul className="flex flex-col gap-2">
+            {players.map((player, idx) => (
+              <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                <span className="mr-4">{player.name}</span>
+                <div className="border border-black rounded px-3 py-1 text-center">
+                  {player.score}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Sizers' Estimates</h2>
-              <div className="mb-4">
-                <label className="block font-semibold mb-1">{players[sizerA].name}'s Estimate</label>
-                <input
-                  type="number"
-                  className="border border-black rounded p-2 w-full"
-                  placeholder="Enter your single, exact numerical estimate"
-                  value={estimateA}
-                  onChange={(e) => handleEstimateChange(sizerA, e.target.value)}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block font-semibold mb-1">{players[sizerB].name}'s Estimate</label>
-                <input
-                  type="number"
-                  className="border border-black rounded p-2 w-full"
-                  placeholder="Enter your single, exact numerical estimate"
-                  value={estimateB}
-                  onChange={(e) => handleEstimateChange(sizerB, e.target.value)}
-                />
-              </div>
-              <p className="text-gray-600 text-sm">
-                (Each Sizer has ~2 minutes to think and write their estimate, then reveal.)
-              </p>
-            </div>
+        {/* Current Question */}
+        <div className="mb-6 text-center">
+          <h2 className="text-xl font-semibold mb-2">Current Question</h2>
+          <p className="text-lg mb-2">
+            <span className="font-bold">{currentSizable}</span> in{' '}
+            <span className="font-bold">{currentCohort}</span>?
+          </p>
+          <p className="text-sm text-gray-600">
+            (All players should agree on the scope of the question before proceeding.)
+          </p>
+        </div>
 
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Judges' Decision</h2>
-              <p className="mb-4">Judges, vote on which estimate seems more plausible, or pick an alternate outcome:</p>
-              <div className="flex flex-wrap gap-4">
-                <button
-                  onClick={() => handleVote(sizerA)}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                  Vote for {players[sizerA].name}
-                </button>
-                <button
-                  onClick={() => handleVote(sizerB)}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                  Vote for {players[sizerB].name}
-                </button>
-                <button
-                  onClick={handleNoPoints}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
-                >
-                  No Points (Both fail)
-                </button>
-                {bothGuessedSame && (
-                  <button
-                    onClick={handleTiePoints}
-                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded"
-                  >
-                    Both Correct (1 point each)
-                  </button>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {champion && (
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">We Have a Champion!</h1>
-            <p className="text-xl mb-6">
-              Congratulations {champion.name}, you reached {champion.score} points!
-            </p>
-            <button
-              onClick={() => {
-                const resetPlayers = players.map((p) => ({ ...p, score: 0 }));
-                setPlayers(resetPlayers);
-                setCurrentSizers([0, 1]);
-                setEstimates({});
-                setStage('setup');
-              }}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            >
-              Play Again
-            </button>
+        {/* Sizers' Estimates */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-2">Sizers' Estimates</h2>
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">
+              {players[sizerA].name}&apos;s Estimate
+            </label>
+            <input
+              type="number"
+              className="border border-black rounded p-2 w-full"
+              placeholder="Enter your single, exact numerical estimate"
+              value={estimateA}
+              onChange={(e) => handleEstimateChange(sizerA, e.target.value)}
+            />
           </div>
-        )}
+          <div className="mb-4">
+            <label className="block font-semibold mb-2">
+              {players[sizerB].name}&apos;s Estimate
+            </label>
+            <input
+              type="number"
+              className="border border-black rounded p-2 w-full"
+              placeholder="Enter your single, exact numerical estimate"
+              value={estimateB}
+              onChange={(e) => handleEstimateChange(sizerB, e.target.value)}
+            />
+          </div>
+          <p className="text-gray-600 text-sm">
+            (Each Sizer has ~2 minutes to think and write their estimate, then reveal.)
+          </p>
+        </div>
+
+        {/* Judges' Decision */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-2">Judges&apos; Decision</h2>
+          <p className="mb-4">
+            Judges, vote on which estimate seems more plausible, or pick an alternate outcome:
+          </p>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <button
+              onClick={() => handleVote(sizerA)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Vote for {players[sizerA].name}
+            </button>
+            <button
+              onClick={() => handleVote(sizerB)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Vote for {players[sizerB].name}
+            </button>
+            <button
+              onClick={handleNoPoints}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            >
+              No Points (Both fail)
+            </button>
+            {bothGuessedSame && (
+              <button
+                onClick={handleTiePoints}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded"
+              >
+                Both Correct (1 point each)
+              </button>
+            )}
+          </div>
+        </div>
       </motion.div>
     </div>
   );
