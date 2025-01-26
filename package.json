@@ -11,9 +11,5 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "framer-motion": "latest"
-    // "lucide-react": "latest"   (only keep if you actually need it)
-    // remove or comment out the others:
-    // "@/components/ui/card": "latest",
-    // "@/components/ui/button": "latest"
   }
 }
