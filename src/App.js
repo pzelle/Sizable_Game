@@ -7,10 +7,13 @@ const GEO_URL =
 const SIZABLE_URL =
   'https://docs.google.com/spreadsheets/d/1zeW6OCKSnpCKt6o1VRGZ2yR3mTCH1OmPY7m_zHVURHI/export?format=csv&gid=0';
 
+// WARNING: This front-end approach exposes your API key in the browser bundle.
+const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY || '';
+
 function App() {
   // Stage: 'setup' or 'playing'
   const [stage, setStage] = useState('setup');
-  const [numPlayers, setNumPlayers] = useState(4);
+  const [numPlayers, setNumPlayers] = useState(3); // default
   const [tempNames, setTempNames] = useState([]);
   const [setupError, setSetupError] = useState('');
   const [players, setPlayers] = useState([]);
@@ -28,15 +31,19 @@ function App() {
   // Sizers' estimates
   const [estimates, setEstimates] = useState({});
 
-  // Target score to win
-  const [targetScore, setTargetScore] = useState(5);
+  // Target score (dropdown, range 3–10)
+  const [targetScore, setTargetScore] = useState(3);
 
-  // Fetch geographic cohorts
+  // ChatGPT state
+  const [aiAnswer, setAiAnswer] = useState(''); // to store the AI response
+
+  // Fetch cohorts
   useEffect(() => {
     fetch(GEO_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split('\n')
+        const lines = text
+          .split('\n')
           .map((line) => line.trim())
           .filter((line) => line);
         setSampleGeographicCohorts(lines);
@@ -49,7 +56,8 @@ function App() {
     fetch(SIZABLE_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split('\n')
+        const lines = text
+          .split('\n')
           .map((line) => line.trim())
           .filter((line) => line);
         setSampleSizableItems(lines);
@@ -57,7 +65,7 @@ function App() {
       .catch((err) => console.error('Error fetching sizable items:', err));
   }, []);
 
-  // Randomly select new cards
+  // Randomly pick new cards
   const drawNewCards = () => {
     if (!sampleGeographicCohorts.length || !sampleSizableItems.length) {
       setCurrentCohort('Still loading...');
@@ -66,14 +74,13 @@ function App() {
     }
     const randomCohort = sampleGeographicCohorts[
       Math.floor(Math.random() * sampleGeographicCohorts.length)
-    ];
+    ].replace(/"/g, '');
     const randomSizable = sampleSizableItems[
       Math.floor(Math.random() * sampleSizableItems.length)
-    ];
+    ].replace(/"/g, '');
 
-    // Remove any stray quotes from CSV lines
-    setCurrentCohort(randomCohort.replace(/"/g, ''));
-    setCurrentSizable(randomSizable.replace(/"/g, ''));
+    setCurrentCohort(randomCohort);
+    setCurrentSizable(randomSizable);
   };
 
   useEffect(() => {
@@ -81,9 +88,10 @@ function App() {
       drawNewCards();
       setCurrentSizers([0, 1]);
     }
+    // eslint-disable-next-line
   }, [stage, sampleGeographicCohorts, sampleSizableItems]);
 
-  // Round-robin logic
+  // Round-robin
   const nextRound = (winnerIndex, loserIndex) => {
     let newSizerIndex = (loserIndex + 1) % players.length;
     while (newSizerIndex === winnerIndex) {
@@ -91,10 +99,11 @@ function App() {
     }
     setCurrentSizers([winnerIndex, newSizerIndex]);
     setEstimates({});
+    setAiAnswer(''); // Clear AI answer each round
     drawNewCards();
   };
 
-  // If both sizers guess the same number => +1 point each
+  // If both guess the same
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -107,7 +116,7 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Judge votes for single winner
+  // Single winner
   const handleVote = (winnerIndex) => {
     const updatedPlayers = players.map((p, idx) => {
       if (idx === winnerIndex) {
@@ -128,15 +137,13 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Track sizers' typed estimates
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
   };
 
-  // Is there a champion?
   const champion = players.find((p) => p.score >= targetScore);
 
-  // Start Game
+  // Setup complete
   const handleStartGame = () => {
     setSetupError('');
     const trimmed = tempNames.map((n) => n.trim());
@@ -155,7 +162,51 @@ function App() {
     setStage('playing');
   };
 
-  // If we're still at setup
+  // *** ChatGPT integration ***
+  const handleAskAi = async () => {
+    try {
+      if (!OPENAI_API_KEY) {
+        alert('No OpenAI API key found. Please set REACT_APP_OPENAI_API_KEY in your environment.');
+        return;
+      }
+
+      // The question we feed ChatGPT
+      const question = `${currentSizable} in ${currentCohort}?`;
+      // Full prompt
+      const userPrompt = `Answer the following question as simply as possible, giving me a single number. Use any data built into your model or on the internet. It is okay to make guesses or assumptions in order to get to a specific number.\n\n${question}`;
+
+      // We'll use GPT-3.5-turbo (chat completions)
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'user', content: userPrompt }
+          ],
+          max_tokens: 200,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const aiText = data.choices?.[0]?.message?.content || 'No response from AI.';
+      setAiAnswer(aiText.trim());
+    } catch (error) {
+      console.error('Error calling OpenAI API:', error);
+      setAiAnswer(`Error: ${error.message}`);
+    }
+  };
+
+  // *** Render UI ***
+
   if (stage === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -174,18 +225,13 @@ function App() {
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
                 setNumPlayers(val);
-                setTempNames([]);
+                setTempNames([]); // reset names if changed
               }}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
             >
-              {[...Array(8)].map((_, i) => {
-                const val = i + 3; // options 3..10
-                return (
-                  <option key={val} value={val}>
-                    {val}
-                  </option>
-                );
-              })}
+              {Array.from({ length: 8 }, (_, i) => i + 3).map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
             </select>
           </div>
 
@@ -193,9 +239,7 @@ function App() {
             <h2 className="text-xl font-semibold mb-2">Enter Player Names</h2>
             {[...Array(numPlayers)].map((_, i) => (
               <div key={i} className="mb-3">
-                <label className="block text-sm mb-1">
-                  Player {i + 1}
-                </label>
+                <label className="block text-sm mb-1">Player {i + 1}</label>
                 <input
                   type="text"
                   className="p-2 w-full rounded border border-gray-300 bg-gray-50 text-gray-800"
@@ -214,20 +258,12 @@ function App() {
             <label className="block font-semibold mb-2">Target Score</label>
             <select
               value={targetScore}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setTargetScore(val);
-              }}
+              onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
             >
-              {[...Array(8)].map((_, i) => {
-                const val = i + 3; // options 3..10
-                return (
-                  <option key={val} value={val}>
-                    {val}
-                  </option>
-                );
-              })}
+              {Array.from({ length: 8 }, (_, i) => i + 3).map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
             </select>
           </div>
 
@@ -250,7 +286,12 @@ function App() {
     );
   }
 
-  // If there's a champion
+  const [sizerA, sizerB] = currentSizers;
+  const estimateA = estimates[sizerA] || '';
+  const estimateB = estimates[sizerB] || '';
+  const bothGuessedSame = estimateA && estimateB && estimateA === estimateB;
+  const champion = players.find((p) => p.score >= targetScore);
+
   if (champion) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -280,12 +321,6 @@ function App() {
       </div>
     );
   }
-
-  // Game in progress
-  const [sizerA, sizerB] = currentSizers;
-  const estimateA = estimates[sizerA] || '';
-  const estimateB = estimates[sizerB] || '';
-  const bothGuessedSame = estimateA && estimateB && estimateA === estimateB;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -329,10 +364,10 @@ function App() {
 
         {/* Sizers' Estimates */}
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">Sizers' Estimates</h2>
+          <h2 className="text-2xl font-semibold mb-4">Sizers&apos; Estimates</h2>
           <div className="mb-4">
             <label className="block font-medium mb-1">
-              {players[sizerA].name}'s Estimate
+              {players[sizerA].name}&apos;s Estimate
             </label>
             <input
               type="number"
@@ -344,7 +379,7 @@ function App() {
           </div>
           <div className="mb-4">
             <label className="block font-medium mb-1">
-              {players[sizerB].name}'s Estimate
+              {players[sizerB].name}&apos;s Estimate
             </label>
             <input
               type="number"
@@ -360,8 +395,8 @@ function App() {
         </div>
 
         {/* Judges' Decision */}
-        <div>
-          <h2 className="text-2xl font-semibold mb-4">Judges' Decision</h2>
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-4">Judges&apos; Decision</h2>
           <p className="text-gray-200 mb-6">
             Vote on the most plausible estimate or pick an alternative outcome:
           </p>
@@ -393,6 +428,23 @@ function App() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Ask AI button + AI Answer */}
+        <div className="text-center">
+          <button
+            onClick={handleAskAi}
+            className="bg-indigo-500 hover:bg-indigo-600 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+          >
+            Ask AI
+          </button>
+          {aiAnswer && (
+            <div className="mt-4 p-3 bg-gray-800 rounded text-left">
+              <p className="text-sm text-gray-100 whitespace-pre-line">
+                {aiAnswer}
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>
