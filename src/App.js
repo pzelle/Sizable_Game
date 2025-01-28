@@ -371,5 +371,70 @@ function App() {
               type="number"
               className="w-full p-2 rounded border border-gray-400 bg-gray-50 text-gray-800"
               placeholder="Enter a single, exact number"
- 
-)
+              value={estimateB}
+              onChange={(e) => handleEstimateChange(sizerB, e.target.value)}
+            />
+          </div>
+          <p className="text-sm text-gray-300">
+            (Each Sizer has ~2 minutes to think and write their estimate, then reveal.)
+          </p>
+        </div>
+
+        {/* Judges' Decision */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold mb-4">Judges&apos; Decision</h2>
+          <p className="text-gray-200 mb-6">
+            Vote on the most plausible estimate or pick an alternative outcome:
+          </p>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <button
+              onClick={() => handleVote(sizerA)}
+              className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+            >
+              Vote for {players[sizerA].name}
+            </button>
+            <button
+              onClick={() => handleVote(sizerB)}
+              className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+            >
+              Vote for {players[sizerB].name}
+            </button>
+            <button
+              onClick={handleNoPoints}
+              className="bg-gray-600 hover:bg-gray-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+            >
+              No Points
+            </button>
+            {bothGuessedSame && (
+              <button
+                onClick={handleTiePoints}
+                className="bg-purple-600 hover:bg-purple-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+              >
+                Both Correct (+1 each)
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Ask AI button + AI Answer */}
+        <div className="text-center">
+          <button
+            onClick={handleAskAi}
+            className="bg-indigo-500 hover:bg-indigo-600 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
+          >
+            Ask AI
+          </button>
+          {aiAnswer && (
+            <div className="mt-4 p-3 bg-gray-800 rounded text-left">
+              <p className="text-sm text-gray-100 whitespace-pre-line">
+                {aiAnswer}
+              </p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+export default App;
