@@ -13,31 +13,36 @@ const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY || '';
 function App() {
   // Stage: 'setup' or 'playing'
   const [stage, setStage] = useState('setup');
-  const [numPlayers, setNumPlayers] = useState(3); // default
+
+  // For setup
+  const [numPlayers, setNumPlayers] = useState(3); // default to 3
   const [tempNames, setTempNames] = useState([]);
   const [setupError, setSetupError] = useState('');
+
+  // After setup, store the real players array
   const [players, setPlayers] = useState([]);
 
+  // Fetch data arrays
   const [sampleGeographicCohorts, setSampleGeographicCohorts] = useState([]);
   const [sampleSizableItems, setSampleSizableItems] = useState([]);
 
-  // Indices of current sizers
+  // Indices of current Sizers
   const [currentSizers, setCurrentSizers] = useState([0, 1]);
 
-  // Current randomly drawn items
+  // Current question
   const [currentCohort, setCurrentCohort] = useState('');
   const [currentSizable, setCurrentSizable] = useState('');
 
-  // Sizers' estimates
+  // Each Sizer's estimate
   const [estimates, setEstimates] = useState({});
 
-  // Target score (dropdown, range 3–10)
+  // Target Score (dropdown from 3 to 10)
   const [targetScore, setTargetScore] = useState(3);
 
   // ChatGPT state
-  const [aiAnswer, setAiAnswer] = useState(''); // to store the AI response
+  const [aiAnswer, setAiAnswer] = useState('');
 
-  // Fetch cohorts
+  // Fetch geographic cohorts once
   useEffect(() => {
     fetch(GEO_URL)
       .then((res) => res.text())
@@ -51,7 +56,7 @@ function App() {
       .catch((err) => console.error('Error fetching geographic cohorts:', err));
   }, []);
 
-  // Fetch sizable items
+  // Fetch sizable items once
   useEffect(() => {
     fetch(SIZABLE_URL)
       .then((res) => res.text())
@@ -65,7 +70,7 @@ function App() {
       .catch((err) => console.error('Error fetching sizable items:', err));
   }, []);
 
-  // Randomly pick new cards
+  // Randomly select new cards
   const drawNewCards = () => {
     if (!sampleGeographicCohorts.length || !sampleSizableItems.length) {
       setCurrentCohort('Still loading...');
@@ -83,6 +88,7 @@ function App() {
     setCurrentSizable(randomSizable);
   };
 
+  // When we move to 'playing'
   useEffect(() => {
     if (stage === 'playing') {
       drawNewCards();
@@ -91,7 +97,7 @@ function App() {
     // eslint-disable-next-line
   }, [stage, sampleGeographicCohorts, sampleSizableItems]);
 
-  // Round-robin
+  // Round-robin logic
   const nextRound = (winnerIndex, loserIndex) => {
     let newSizerIndex = (loserIndex + 1) % players.length;
     while (newSizerIndex === winnerIndex) {
@@ -99,11 +105,11 @@ function App() {
     }
     setCurrentSizers([winnerIndex, newSizerIndex]);
     setEstimates({});
-    setAiAnswer(''); // Clear AI answer each round
+    setAiAnswer(''); // clear AI each round
     drawNewCards();
   };
 
-  // If both guess the same
+  // If both guess same
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -137,45 +143,24 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
+  // Sizer inputs
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
-  };
-
-  const champion = players.find((p) => p.score >= targetScore);
-
-  // Setup complete
-  const handleStartGame = () => {
-    setSetupError('');
-    const trimmed = tempNames.map((n) => n.trim());
-    if (trimmed.some((name) => !name)) {
-      setSetupError('All players must have a non-empty, unique name.');
-      return;
-    }
-    const lowerCased = trimmed.map((n) => n.toLowerCase());
-    const uniqueSet = new Set(lowerCased);
-    if (uniqueSet.size !== lowerCased.length) {
-      setSetupError('All player names must be unique.');
-      return;
-    }
-    const newPlayers = trimmed.map((name) => ({ name, score: 0 }));
-    setPlayers(newPlayers);
-    setStage('playing');
   };
 
   // *** ChatGPT integration ***
   const handleAskAi = async () => {
     try {
       if (!OPENAI_API_KEY) {
-        alert('No OpenAI API key found. Please set REACT_APP_OPENAI_API_KEY in your environment.');
+        alert('No OpenAI API key found. Set REACT_APP_OPENAI_API_KEY in environment.');
         return;
       }
 
-      // The question we feed ChatGPT
+      // Construct question
       const question = `${currentSizable} in ${currentCohort}?`;
-      // Full prompt
-      const userPrompt = `Answer the following question as simply as possible, giving me a single number. Use any data built into your model or on the internet. It is okay to make guesses or assumptions in order to get to a specific number.\n\n${question}`;
+      const userPrompt =
+        `Answer the following question as simply as possible, giving me a single number. Use any data built into your model or on the internet. It is okay to make guesses or assumptions in order to get to a specific number.\n\n${question}`;
 
-      // We'll use GPT-3.5-turbo (chat completions)
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -184,9 +169,7 @@ function App() {
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'user', content: userPrompt }
-          ],
+          messages: [{ role: 'user', content: userPrompt }],
           max_tokens: 200,
           temperature: 0.7
         })
@@ -205,8 +188,10 @@ function App() {
     }
   };
 
-  // *** Render UI ***
+  // *** Check for champion once. *** 
+  const champion = players.find((p) => p.score >= targetScore);
 
+  // *** Setup Screen ***
   if (stage === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -225,7 +210,7 @@ function App() {
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
                 setNumPlayers(val);
-                setTempNames([]); // reset names if changed
+                setTempNames([]);
               }}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
             >
@@ -286,12 +271,7 @@ function App() {
     );
   }
 
-  const [sizerA, sizerB] = currentSizers;
-  const estimateA = estimates[sizerA] || '';
-  const estimateB = estimates[sizerB] || '';
-  const bothGuessedSame = estimateA && estimateB && estimateA === estimateB;
-  const champion = players.find((p) => p.score >= targetScore);
-
+  // *** If we do have a champion ***
   if (champion) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -321,6 +301,12 @@ function App() {
       </div>
     );
   }
+
+  // *** Otherwise, we're in the main game ***
+  const [sizerA, sizerB] = currentSizers;
+  const estimateA = estimates[sizerA] || '';
+  const estimateB = estimates[sizerB] || '';
+  const bothGuessedSame = estimateA && estimateB && estimateA === estimateB;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -385,70 +371,4 @@ function App() {
               type="number"
               className="w-full p-2 rounded border border-gray-400 bg-gray-50 text-gray-800"
               placeholder="Enter a single, exact number"
-              value={estimateB}
-              onChange={(e) => handleEstimateChange(sizerB, e.target.value)}
-            />
-          </div>
-          <p className="text-sm text-gray-300">
-            (Each Sizer has ~2 minutes to think and write their estimate, then reveal.)
-          </p>
-        </div>
-
-        {/* Judges' Decision */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold mb-4">Judges&apos; Decision</h2>
-          <p className="text-gray-200 mb-6">
-            Vote on the most plausible estimate or pick an alternative outcome:
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <button
-              onClick={() => handleVote(sizerA)}
-              className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-            >
-              Vote for {players[sizerA].name}
-            </button>
-            <button
-              onClick={() => handleVote(sizerB)}
-              className="bg-blue-600 hover:bg-blue-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-            >
-              Vote for {players[sizerB].name}
-            </button>
-            <button
-              onClick={handleNoPoints}
-              className="bg-gray-600 hover:bg-gray-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-            >
-              No Points
-            </button>
-            {bothGuessedSame && (
-              <button
-                onClick={handleTiePoints}
-                className="bg-purple-600 hover:bg-purple-700 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-              >
-                Both Correct (+1 each)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Ask AI button + AI Answer */}
-        <div className="text-center">
-          <button
-            onClick={handleAskAi}
-            className="bg-indigo-500 hover:bg-indigo-600 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-          >
-            Ask AI
-          </button>
-          {aiAnswer && (
-            <div className="mt-4 p-3 bg-gray-800 rounded text-left">
-              <p className="text-sm text-gray-100 whitespace-pre-line">
-                {aiAnswer}
-              </p>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-export default App;
+ 
