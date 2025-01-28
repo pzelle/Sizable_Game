@@ -7,48 +7,36 @@ const GEO_URL =
 const SIZABLE_URL =
   'https://docs.google.com/spreadsheets/d/1zeW6OCKSnpCKt6o1VRGZ2yR3mTCH1OmPY7m_zHVURHI/export?format=csv&gid=0';
 
-// WARNING: This front-end approach exposes your API key in the browser bundle.
-const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY || '';
-
 function App() {
   // Stage: 'setup' or 'playing'
   const [stage, setStage] = useState('setup');
-
-  // For setup
-  const [numPlayers, setNumPlayers] = useState(3); // default to 3
+  const [numPlayers, setNumPlayers] = useState(4);
   const [tempNames, setTempNames] = useState([]);
   const [setupError, setSetupError] = useState('');
-
-  // After setup, store the real players array
   const [players, setPlayers] = useState([]);
 
-  // Fetch data arrays
   const [sampleGeographicCohorts, setSampleGeographicCohorts] = useState([]);
   const [sampleSizableItems, setSampleSizableItems] = useState([]);
 
-  // Indices of current Sizers
+  // Indices of current sizers
   const [currentSizers, setCurrentSizers] = useState([0, 1]);
 
-  // Current question
+  // Current randomly drawn items
   const [currentCohort, setCurrentCohort] = useState('');
   const [currentSizable, setCurrentSizable] = useState('');
 
-  // Each Sizer's estimate
+  // Sizers' estimates
   const [estimates, setEstimates] = useState({});
 
-  // Target Score (dropdown from 3 to 10)
-  const [targetScore, setTargetScore] = useState(3);
+  // Target score to win
+  const [targetScore, setTargetScore] = useState(5);
 
-  // ChatGPT state
-  const [aiAnswer, setAiAnswer] = useState('');
-
-  // Fetch geographic cohorts once
+  // Fetch geographic cohorts
   useEffect(() => {
     fetch(GEO_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text
-          .split('\n')
+        const lines = text.split('\n')
           .map((line) => line.trim())
           .filter((line) => line);
         setSampleGeographicCohorts(lines);
@@ -56,13 +44,12 @@ function App() {
       .catch((err) => console.error('Error fetching geographic cohorts:', err));
   }, []);
 
-  // Fetch sizable items once
+  // Fetch sizable items
   useEffect(() => {
     fetch(SIZABLE_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text
-          .split('\n')
+        const lines = text.split('\n')
           .map((line) => line.trim())
           .filter((line) => line);
         setSampleSizableItems(lines);
@@ -79,16 +66,17 @@ function App() {
     }
     const randomCohort = sampleGeographicCohorts[
       Math.floor(Math.random() * sampleGeographicCohorts.length)
-    ].replace(/"/g, '');
+    ];
     const randomSizable = sampleSizableItems[
       Math.floor(Math.random() * sampleSizableItems.length)
-    ].replace(/"/g, '');
+    ];
 
-    setCurrentCohort(randomCohort);
-    setCurrentSizable(randomSizable);
+    // Remove any stray quotes from CSV lines
+    setCurrentCohort(randomCohort.replace(/"/g, ''));
+    setCurrentSizable(randomSizable.replace(/"/g, ''));
   };
 
-  // When we move to 'playing'
+  // On stage change to 'playing'
   useEffect(() => {
     if (stage === 'playing') {
       drawNewCards();
@@ -105,11 +93,10 @@ function App() {
     }
     setCurrentSizers([winnerIndex, newSizerIndex]);
     setEstimates({});
-    setAiAnswer(''); // clear AI each round
     drawNewCards();
   };
 
-  // If both guess same
+  // Both sizers guess the same -> 1 point each
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -143,55 +130,33 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Sizer inputs
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
   };
 
-  // *** ChatGPT integration ***
-  const handleAskAi = async () => {
-    try {
-      if (!OPENAI_API_KEY) {
-        alert('No OpenAI API key found. Set REACT_APP_OPENAI_API_KEY in environment.');
-        return;
-      }
-
-      // Construct question
-      const question = `${currentSizable} in ${currentCohort}?`;
-      const userPrompt =
-        `Answer the following question as simply as possible, giving me a single number. Use any data built into your model or on the internet. It is okay to make guesses or assumptions in order to get to a specific number.\n\n${question}`;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: userPrompt }],
-          max_tokens: 200,
-          temperature: 0.7
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const aiText = data.choices?.[0]?.message?.content || 'No response from AI.';
-      setAiAnswer(aiText.trim());
-    } catch (error) {
-      console.error('Error calling OpenAI API:', error);
-      setAiAnswer(`Error: ${error.message}`);
-    }
-  };
-
-  // *** Check for champion once. *** 
+  // Do we have a champion?
   const champion = players.find((p) => p.score >= targetScore);
 
-  // *** Setup Screen ***
+  // Start game
+  const handleStartGame = () => {
+    setSetupError('');
+    const trimmed = tempNames.map((n) => n.trim());
+    if (trimmed.some((name) => !name)) {
+      setSetupError('All players must have a non-empty, unique name.');
+      return;
+    }
+    const lowerCased = trimmed.map((n) => n.toLowerCase());
+    const uniqueSet = new Set(lowerCased);
+    if (uniqueSet.size !== lowerCased.length) {
+      setSetupError('All player names must be unique.');
+      return;
+    }
+    const newPlayers = trimmed.map((name) => ({ name, score: 0 }));
+    setPlayers(newPlayers);
+    setStage('playing');
+  };
+
+  // Setup Screen
   if (stage === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -205,19 +170,20 @@ function App() {
 
           <div className="mb-4">
             <label className="block font-semibold mb-2">Number of Players</label>
-            <select
+            <input
+              type="number"
+              min="3"
+              max="20"
               value={numPlayers}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                setNumPlayers(val);
-                setTempNames([]);
+                if (val >= 3 && val <= 20) {
+                  setNumPlayers(val);
+                  setTempNames([]);
+                }
               }}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
-            >
-              {Array.from({ length: 8 }, (_, i) => i + 3).map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="mb-6">
@@ -241,15 +207,12 @@ function App() {
 
           <div className="mb-4">
             <label className="block font-semibold mb-2">Target Score</label>
-            <select
+            <input
+              type="number"
               value={targetScore}
-              onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
+              onChange={(e) => setTargetScore(Number(e.target.value))}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
-            >
-              {Array.from({ length: 8 }, (_, i) => i + 3).map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+            />
           </div>
 
           {setupError && (
@@ -271,7 +234,7 @@ function App() {
     );
   }
 
-  // *** If we do have a champion ***
+  // If there's a champion
   if (champion) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -302,7 +265,7 @@ function App() {
     );
   }
 
-  // *** Otherwise, we're in the main game ***
+  // Game in progress
   const [sizerA, sizerB] = currentSizers;
   const estimateA = estimates[sizerA] || '';
   const estimateB = estimates[sizerB] || '';
@@ -381,7 +344,7 @@ function App() {
         </div>
 
         {/* Judges' Decision */}
-        <div className="mb-6">
+        <div>
           <h2 className="text-2xl font-semibold mb-4">Judges&apos; Decision</h2>
           <p className="text-gray-200 mb-6">
             Vote on the most plausible estimate or pick an alternative outcome:
@@ -414,23 +377,6 @@ function App() {
               </button>
             )}
           </div>
-        </div>
-
-        {/* Ask AI button + AI Answer */}
-        <div className="text-center">
-          <button
-            onClick={handleAskAi}
-            className="bg-indigo-500 hover:bg-indigo-600 transition-colors duration-300 text-white px-5 py-2 rounded font-medium"
-          >
-            Ask AI
-          </button>
-          {aiAnswer && (
-            <div className="mt-4 p-3 bg-gray-800 rounded text-left">
-              <p className="text-sm text-gray-100 whitespace-pre-line">
-                {aiAnswer}
-              </p>
-            </div>
-          )}
         </div>
       </motion.div>
     </div>
