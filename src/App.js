@@ -76,13 +76,11 @@ function App() {
     setCurrentSizable(randomSizable.replace(/"/g, ''));
   };
 
-  // On stage change to 'playing'
   useEffect(() => {
     if (stage === 'playing') {
       drawNewCards();
       setCurrentSizers([0, 1]);
     }
-    // eslint-disable-next-line
   }, [stage, sampleGeographicCohorts, sampleSizableItems]);
 
   // Round-robin logic
@@ -96,7 +94,7 @@ function App() {
     drawNewCards();
   };
 
-  // Both sizers guess the same -> 1 point each
+  // If both sizers guess the same number => +1 point each
   const handleTiePoints = () => {
     const [sizerA, sizerB] = currentSizers;
     const updatedPlayers = players.map((p, idx) => {
@@ -109,7 +107,7 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
-  // Single winner
+  // Judge votes for single winner
   const handleVote = (winnerIndex) => {
     const updatedPlayers = players.map((p, idx) => {
       if (idx === winnerIndex) {
@@ -130,14 +128,15 @@ function App() {
     nextRound(sizerA, sizerB);
   };
 
+  // Track sizers' typed estimates
   const handleEstimateChange = (playerIndex, value) => {
     setEstimates({ ...estimates, [playerIndex]: value });
   };
 
-  // Do we have a champion?
+  // Is there a champion?
   const champion = players.find((p) => p.score >= targetScore);
 
-  // Start game
+  // Start Game
   const handleStartGame = () => {
     setSetupError('');
     const trimmed = tempNames.map((n) => n.trim());
@@ -156,7 +155,7 @@ function App() {
     setStage('playing');
   };
 
-  // Setup Screen
+  // If we're still at setup
   if (stage === 'setup') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -170,27 +169,33 @@ function App() {
 
           <div className="mb-4">
             <label className="block font-semibold mb-2">Number of Players</label>
-            <input
-              type="number"
-              min="3"
-              max="20"
+            <select
               value={numPlayers}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                if (val >= 3 && val <= 20) {
-                  setNumPlayers(val);
-                  setTempNames([]);
-                }
+                setNumPlayers(val);
+                setTempNames([]);
               }}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
-            />
+            >
+              {[...Array(8)].map((_, i) => {
+                const val = i + 3; // options 3..10
+                return (
+                  <option key={val} value={val}>
+                    {val}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           <div className="mb-6">
             <h2 className="text-xl font-semibold mb-2">Enter Player Names</h2>
             {[...Array(numPlayers)].map((_, i) => (
               <div key={i} className="mb-3">
-                <label className="block text-sm mb-1">Player {i + 1}</label>
+                <label className="block text-sm mb-1">
+                  Player {i + 1}
+                </label>
                 <input
                   type="text"
                   className="p-2 w-full rounded border border-gray-300 bg-gray-50 text-gray-800"
@@ -207,12 +212,23 @@ function App() {
 
           <div className="mb-4">
             <label className="block font-semibold mb-2">Target Score</label>
-            <input
-              type="number"
+            <select
               value={targetScore}
-              onChange={(e) => setTargetScore(Number(e.target.value))}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                setTargetScore(val);
+              }}
               className="w-24 p-2 rounded border border-gray-300 bg-gray-50 text-gray-800"
-            />
+            >
+              {[...Array(8)].map((_, i) => {
+                const val = i + 3; // options 3..10
+                return (
+                  <option key={val} value={val}>
+                    {val}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           {setupError && (
@@ -313,10 +329,10 @@ function App() {
 
         {/* Sizers' Estimates */}
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">Sizers&apos; Estimates</h2>
+          <h2 className="text-2xl font-semibold mb-4">Sizers' Estimates</h2>
           <div className="mb-4">
             <label className="block font-medium mb-1">
-              {players[sizerA].name}&apos;s Estimate
+              {players[sizerA].name}'s Estimate
             </label>
             <input
               type="number"
@@ -328,7 +344,7 @@ function App() {
           </div>
           <div className="mb-4">
             <label className="block font-medium mb-1">
-              {players[sizerB].name}&apos;s Estimate
+              {players[sizerB].name}'s Estimate
             </label>
             <input
               type="number"
@@ -345,7 +361,7 @@ function App() {
 
         {/* Judges' Decision */}
         <div>
-          <h2 className="text-2xl font-semibold mb-4">Judges&apos; Decision</h2>
+          <h2 className="text-2xl font-semibold mb-4">Judges' Decision</h2>
           <p className="text-gray-200 mb-6">
             Vote on the most plausible estimate or pick an alternative outcome:
           </p>
