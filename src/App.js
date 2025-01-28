@@ -372,3 +372,4 @@ function App() {
               className="w-full p-2 rounded border border-gray-400 bg-gray-50 text-gray-800"
               placeholder="Enter a single, exact number"
  
+)
